@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity } from 'react-native
 import React, { useState } from 'react';
 import { Receipt21 } from 'iconsax-react-native';
 import FastImage from 'react-native-fast-image';
-import { fontType, colors } from '../theme';
+import { fontType, colors } from '../assets/theme';
 const ItemHorizontal = ({ item, variant, onPress }) => {
     return (
         <View style={itemHorizontal.cardItem}>

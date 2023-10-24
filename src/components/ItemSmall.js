@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { Receipt21, Clock, Message } from 'iconsax-react-native';
 import React from 'react';
-import { fontType, colors } from '../theme';
+import { fontType, colors } from '../assets/theme';
 
 const ItemSmall = ({ item }) => {
     return (

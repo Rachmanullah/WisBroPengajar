@@ -1,4 +1,5 @@
 import ItemSmall from './ItemSmall'
 import ItemBookmark from './ItemBookmark'
 import ListHorizontal from './ListHorizontal'
-export { ItemSmall, ItemBookmark, ListHorizontal }
+import SearchBar from './SearchBar'
+export { ItemSmall, ItemBookmark, ListHorizontal, SearchBar }

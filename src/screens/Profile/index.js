@@ -1,32 +1,51 @@
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { Setting2, Edit } from 'iconsax-react-native';
-import { useNavigation } from "@react-navigation/native";
-import React from 'react';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { Edit, Setting2 } from 'iconsax-react-native';
+import React, { useState, useCallback } from 'react';
 import FastImage from 'react-native-fast-image';
-import { ProfileData, BlogList } from '../../../data';
+import { ProfileData } from '../../../data';
 import { ItemSmall } from '../../components';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { fontType, colors } from '../../assets/theme';
+import { formatNumber } from '../../utils/formatNumber';
+import axios from 'axios';
 
-const formatNumber = number => {
-    if (number >= 1000000000) {
-        return (number / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
-    }
-    if (number >= 1000000) {
-        return (number / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    }
-    if (number >= 1000) {
-        return (number / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    }
-    return number.toString();
-};
-
-const data = BlogList.slice(5);
 const Profile = () => {
     const navigation = useNavigation();
+    const [loading, setLoading] = useState(true);
+    const [blogData, setBlogData] = useState([]);
+    const [refreshing, setRefreshing] = useState(false);
+    const getDataBlog = async () => {
+        try {
+            const response = await axios.get(
+                'https://65645857ceac41c0761df4c7.mockapi.io/wocoApp/blog',
+            );
+            setBlogData(response.data);
+            setLoading(false)
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        setTimeout(() => {
+            getDataBlog()
+            setRefreshing(false);
+        }, 1500);
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            getDataBlog();
+        }, [])
+    );
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Setting2 color={colors.black()} variant="Linear" size={24} />
+                <TouchableOpacity>
+                    <Setting2 color={colors.black()} variant="Linear" size={24} />
+                </TouchableOpacity>
             </View>
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -34,7 +53,9 @@ const Profile = () => {
                     paddingHorizontal: 24,
                     gap: 10,
                     paddingVertical: 20,
-                }}>
+                }} refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }>
                 <View style={{ gap: 15, alignItems: 'center' }}>
                     <FastImage
                         style={profile.pic}
@@ -74,15 +95,16 @@ const Profile = () => {
                     </TouchableOpacity>
                 </View>
                 <View style={{ paddingVertical: 10, gap: 10 }}>
-                    {data.map((item, index) => (
-                        <ItemSmall item={item} key={index} />
-                    ))}
+                    {loading ? (
+                        <ActivityIndicator size={'large'} color={colors.blue()} />
+                    ) : (
+                        blogData.map((item, index) => <ItemSmall item={item} key={index} />)
+                    )}
                 </View>
             </ScrollView>
             <TouchableOpacity
                 style={styles.floatingButton}
-                onPress={() => navigation.navigate("AddBlog")}
-            >
+                onPress={() => navigation.navigate('AddBlog')}>
                 <Edit color={colors.white()} variant="Linear" size={20} />
             </TouchableOpacity>
         </View>
@@ -90,14 +112,20 @@ const Profile = () => {
 };
 
 export default Profile;
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.white(),
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     header: {
         paddingHorizontal: 24,
-        justifyContent: 'flex-start',
+        justifyContent: 'flex-end',
         flexDirection: 'row',
         alignItems: 'center',
         height: 52,
@@ -133,8 +161,7 @@ const profile = StyleSheet.create({
     name: {
         color: colors.black(),
         fontSize: 20,
-        fontFamily: fontType['Pjs-Bold'],
-        textTransform: 'capitalize'
+        fontFamily: fontType['Pjs-ExtraBold'],
     },
     info: {
         fontSize: 12,

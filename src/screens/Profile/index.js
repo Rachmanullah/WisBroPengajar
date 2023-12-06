@@ -1,45 +1,54 @@
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Edit, Setting2 } from 'iconsax-react-native';
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import FastImage from 'react-native-fast-image';
 import { ProfileData } from '../../../data';
 import { ItemSmall } from '../../components';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { fontType, colors } from '../../assets/theme';
+import firestore from '@react-native-firebase/firestore';
 import { formatNumber } from '../../utils/formatNumber';
-import axios from 'axios';
 
 const Profile = () => {
     const navigation = useNavigation();
     const [loading, setLoading] = useState(true);
     const [blogData, setBlogData] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
-    const getDataBlog = async () => {
-        try {
-            const response = await axios.get(
-                'https://65645857ceac41c0761df4c7.mockapi.io/wocoApp/blog',
-            );
-            setBlogData(response.data);
-            setLoading(false)
-        } catch (error) {
-            console.error(error);
-        }
-    };
+    useEffect(() => {
+        const subscriber = firestore()
+            .collection('blog')
+            .onSnapshot(querySnapshot => {
+                const blogs = [];
+                querySnapshot.forEach(documentSnapshot => {
+                    blogs.push({
+                        ...documentSnapshot.data(),
+                        id: documentSnapshot.id,
+                    });
+                });
+                setBlogData(blogs);
+                setLoading(false);
+            });
+        return () => subscriber();
+    }, []);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         setTimeout(() => {
-            getDataBlog()
+            firestore()
+                .collection('blog')
+                .onSnapshot(querySnapshot => {
+                    const blogs = [];
+                    querySnapshot.forEach(documentSnapshot => {
+                        blogs.push({
+                            ...documentSnapshot.data(),
+                            id: documentSnapshot.id,
+                        });
+                    });
+                    setBlogData(blogs);
+                });
             setRefreshing(false);
         }, 1500);
     }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            getDataBlog();
-        }, [])
-    );
-
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -53,7 +62,8 @@ const Profile = () => {
                     paddingHorizontal: 24,
                     gap: 10,
                     paddingVertical: 20,
-                }} refreshControl={
+                }}
+                refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }>
                 <View style={{ gap: 15, alignItems: 'center' }}>

@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { ArrowLeft } from 'iconsax-react-native';
+import FastImage from 'react-native-fast-image';
+import { ArrowLeft, AddSquare, Add } from 'iconsax-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { fontType, colors } from '../../assets/theme';
-import axios from 'axios';
+import ImagePicker from 'react-native-image-crop-picker';
+import storage from '@react-native-firebase/storage';
+import firestore from '@react-native-firebase/firestore';
 
 const EditBlogForm = ({ route }) => {
     const { blogId } = route.params;
@@ -31,53 +34,79 @@ const EditBlogForm = ({ route }) => {
         });
     };
     const [image, setImage] = useState(null);
+    const [oldImage, setOldImage] = useState(null);
     const navigation = useNavigation();
     const [loading, setLoading] = useState(true);
     useEffect(() => {
-        getBlogById();
+        const subscriber = firestore()
+            .collection('blog')
+            .doc(blogId)
+            .onSnapshot(documentSnapshot => {
+                const blogData = documentSnapshot.data();
+                if (blogData) {
+                    console.log('Blog data: ', blogData);
+                    setBlogData({
+                        title: blogData.title,
+                        content: blogData.content,
+                        category: {
+                            id: blogData.category.id,
+                            name: blogData.category.name,
+                        },
+                    });
+                    setOldImage(blogData.image);
+                    setImage(blogData.image);
+                    setLoading(false);
+                } else {
+                    console.log(`Blog with ID ${blogId} not found.`);
+                }
+            });
+        setLoading(false);
+        return () => subscriber();
     }, [blogId]);
 
-    const getBlogById = async () => {
-        try {
-            const response = await axios.get(
-                `https://65645857ceac41c0761df4c7.mockapi.io/wocoApp/blog/${blogId}`,
-            );
-            setBlogData({
-                title: response.data.title,
-                content: response.data.content,
-                category: {
-                    id: response.data.category.id,
-                    name: response.data.category.name
-                }
+    const handleImagePick = async () => {
+        ImagePicker.openPicker({
+            width: 1920,
+            height: 1080,
+            cropping: true,
+        })
+            .then(image => {
+                console.log(image);
+                setImage(image.path);
             })
-            setImage(response.data.image)
-            setLoading(false);
-        } catch (error) {
-            console.error(error);
-        }
+            .catch(error => {
+                console.log(error);
+            });
     };
+
     const handleUpdate = async () => {
         setLoading(true);
+        let filename = image.substring(image.lastIndexOf('/') + 1);
+        const extension = filename.split('.').pop();
+        const name = filename.split('.').slice(0, -1).join('.');
+        filename = name + Date.now() + '.' + extension;
+        const reference = storage().ref(`blogimages/${filename}`);
         try {
-            await axios
-                .put(`https://65645857ceac41c0761df4c7.mockapi.io/wocoApp/blog/${blogId}`, {
-                    title: blogData.title,
-                    category: blogData.category,
-                    image,
-                    content: blogData.content,
-                    totalComments: blogData.totalComments,
-                    totalLikes: blogData.totalLikes,
-                })
-                .then(function (response) {
-                    console.log(response);
-                })
-                .catch(function (error) {
-                    console.log(error);
-                });
+            if (image !== oldImage && oldImage) {
+                const oldImageRef = storage().refFromURL(oldImage);
+                await oldImageRef.delete();
+            }
+            if (image !== oldImage) {
+                await reference.putFile(image);
+            }
+            const url =
+                image !== oldImage ? await reference.getDownloadURL() : oldImage;
+            await firestore().collection('blog').doc(blogId).update({
+                title: blogData.title,
+                category: blogData.category,
+                image: url,
+                content: blogData.content,
+            });
             setLoading(false);
-            navigation.navigate('Profile');
-        } catch (e) {
-            console.log(e);
+            console.log('Blog Updated!');
+            navigation.navigate('BlogDetail', { blogId });
+        } catch (error) {
+            console.log(error);
         }
     };
 
@@ -118,15 +147,6 @@ const EditBlogForm = ({ route }) => {
                     />
                 </View>
                 <View style={[textInput.borderDashed]}>
-                    <TextInput
-                        placeholder="Image"
-                        value={image}
-                        onChangeText={text => setImage(text)}
-                        placeholderTextColor={colors.grey(0.6)}
-                        style={textInput.content}
-                    />
-                </View>
-                <View style={[textInput.borderDashed]}>
                     <Text
                         style={{
                             fontSize: 12,
@@ -160,6 +180,58 @@ const EditBlogForm = ({ route }) => {
                         })}
                     </View>
                 </View>
+                {image ? (
+                    <View style={{ position: 'relative' }}>
+                        <FastImage
+                            style={{ width: '100%', height: 127, borderRadius: 5 }}
+                            source={{
+                                uri: image,
+                                headers: { Authorization: 'someAuthToken' },
+                                priority: FastImage.priority.high,
+                            }}
+                            resizeMode={FastImage.resizeMode.cover}
+                        />
+                        <TouchableOpacity
+                            style={{
+                                position: 'absolute',
+                                top: -5,
+                                right: -5,
+                                backgroundColor: colors.blue(),
+                                borderRadius: 25,
+                            }}
+                            onPress={() => setImage(null)}>
+                            <Add
+                                size={20}
+                                variant="Linear"
+                                color={colors.white()}
+                                style={{ transform: [{ rotate: '45deg' }] }}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <TouchableOpacity onPress={handleImagePick}>
+                        <View
+                            style={[
+                                textInput.borderDashed,
+                                {
+                                    gap: 10,
+                                    paddingVertical: 30,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                },
+                            ]}>
+                            <AddSquare color={colors.grey(0.6)} variant="Linear" size={42} />
+                            <Text
+                                style={{
+                                    fontFamily: fontType['Pjs-Regular'],
+                                    fontSize: 12,
+                                    color: colors.grey(0.6),
+                                }}>
+                                Upload Thumbnail
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
             </ScrollView>
             <View style={styles.bottomBar}>
                 <TouchableOpacity style={styles.button} onPress={handleUpdate}>
